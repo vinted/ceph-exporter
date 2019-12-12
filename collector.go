@@ -10,6 +10,7 @@ import (
   "reflect"
   "regexp"
   "strings"
+  "time"
 )
 
 var schema = make(map[string]string)
@@ -70,6 +71,7 @@ func GetDeviceType(socketName string) map[string]string {
 
 func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
 
+  scrapeTime := time.Now()
   var osdSchema map[string]interface{}
   var cephMetrics map[string]interface{}
   var cephDevice map[string]string
@@ -106,6 +108,8 @@ func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
       }
     }
   }
+  description := prometheus.NewDesc("ceph_exporter_scrape_time", "Duration of a collector scrape", nil, nil)
+  ch <- prometheus.MustNewConstMetric(description, prometheus.GaugeValue, time.Since(scrapeTime).Seconds())
   log.Debug("Finished")
 }
 
@@ -118,7 +122,7 @@ func CephNormalizeMetricName(metric string) string {
 }
 
 func CephPrometheusDesc(metricName string, description string) *prometheus.Desc{
-    return prometheus.NewDesc(metricName, description, []string{"device"}, nil,)
+  return prometheus.NewDesc(metricName, description, []string{"device"}, nil,)
 }
 
 // Get schema for defined socket. Either query ceph or use stored map if exists.
