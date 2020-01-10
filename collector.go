@@ -77,6 +77,12 @@ func GetDeviceType(socketName string) map[string]string {
 		device["type"] = "ceph_radosgw"
 		device["name"] = strings.ReplaceAll(re.FindString(socketName), ".", "")
 	}
+	if strings.Contains(socketName, "mgr.") {
+		log.Debug("Device is a mgr")
+		var re = regexp.MustCompile(`mgr(.[0-9]*)`)
+		device["type"] = "ceph_mgr"
+		device["name"] = strings.ReplaceAll(re.FindString(socketName), ".", "")
+	}
 	log.Debug("Device:", device)
 	return device
 }
