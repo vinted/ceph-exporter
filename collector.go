@@ -72,11 +72,8 @@ func GetDeviceType(socketName string) map[string]string {
 func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
 
   scrapeTime := time.Now()
-  var osdSchema map[string]interface{}
   var cephMetrics map[string]interface{}
   var cephDevice map[string]string
-  var dataType float64
-  var metricDescription string
 
   log.Debug("Processing request")
   sockets := ListCephSockets()
@@ -87,11 +84,21 @@ func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
       continue
     }
     cephMetrics = (LoadJson(GetMetrics(socket)))
-    osdSchema = (LoadJson(GetSchema(socket)))
+    osdSchema := (LoadJson(GetSchema(socket)))
     for metricName, metricData := range cephMetrics {
       for metricType, metricsValue := range metricData.(map[string]interface{}) {
-        dataType = osdSchema[metricName].(map[string]interface{})[metricType].(map[string]interface{})["type"].(float64)
-        metricDescription = osdSchema[metricName].(map[string]interface{})[metricType].(map[string]interface{})["description"].(string)
+        metricSchema, ok := osdSchema[metricName]
+        // There's a possibility, that no full schema is yet available when ceph daemon
+        // is starting. Thus we should check on that and destroy partial schema.
+        if !ok {
+          log.Debug("Missing schema for metric, - socket might be starting up: ", socket)
+          // Delete partial schema
+          delete(schema, socket);
+          continue
+        }
+        metric := metricSchema.(map[string]interface{})[metricType]
+        dataType := metric.(map[string]interface{})["type"].(float64)
+        metricDescription := metric.(map[string]interface{})["description"].(string)
         var normalizedMetricName string
 
         normalizedMetricName = CephNormalizeMetricName(metricName)
