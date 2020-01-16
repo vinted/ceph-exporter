@@ -31,13 +31,16 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+		_, err := w.Write([]byte(`<html>
     <head><title>Ceph Exporter</title></head>
     <body>
     <h1>Ceph Exporter</h1>
     <p><a href='metrics'>Metrics</a></p>
     </body>
     </html>`))
+		if err != nil {
+			log.Error("HTTP write failed: ", err)
+		}
 	})
 	log.Info("Listening on: ", *bindAddr)
 	log.Fatal(http.ListenAndServe(*bindAddr, nil))
