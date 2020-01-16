@@ -28,7 +28,10 @@ func (collector *cephCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func LoadJson(jsonData string) map[string]interface{} {
 	var result map[string]interface{}
-	json.Unmarshal([]byte(jsonData), &result)
+	err := json.Unmarshal([]byte(jsonData), &result)
+	if err != nil {
+		log.Error("Error loading json: ", err)
+	}
 	// Workaround for radosgw client metrics.
 	// Removing hostname from metric name.
 	// We need only host name, not FQDN.
@@ -98,9 +101,8 @@ func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
 				metric := metricSchema.(map[string]interface{})[metricType]
 				dataType := metric.(map[string]interface{})["type"].(float64)
 				metricDescription := metric.(map[string]interface{})["description"].(string)
-				var normalizedMetricName string
+				normalizedMetricName := CephNormalizeMetricName(metricName)
 
-				normalizedMetricName = CephNormalizeMetricName(metricName)
 				// There are metrics with second level of data (SUMs and AVGs)
 				if reflect.TypeOf(metricsValue).Kind() == reflect.Map {
 					for metricType1, metricsValue1 := range metricsValue.(map[string]interface{}) {
