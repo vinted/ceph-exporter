@@ -37,3 +37,5 @@ Following config parameters are available:
     	Logging level (default "info")
   -telemetry.addr string
     	host:port for ceph exporter (default ":9353")
+  -query.interval int
+      How often should daemon read asok metrics (default 15)
