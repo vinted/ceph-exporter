@@ -2,16 +2,17 @@ package main
 
 import (
 	"flag"
-	log "github.com/sirupsen/logrus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 )
 
 var (
-	bindAddr = flag.String("telemetry.addr", ":9353", "host:port for ceph exporter")
-	asokPath = flag.String("asok.path", "/var/run/ceph", "path to ceph admin socket direcotry")
-	logLevel = flag.String("log.level", "info", "Logging level")
+	bindAddr      = flag.String("telemetry.addr", ":9353", "host:port for ceph exporter")
+	asokPath      = flag.String("asok.path", "/var/run/ceph", "path to ceph admin socket direcotry")
+	queryInterval = flag.Int("query.interval", 15, "How often should daemon read asok metrics (in seconds0")
+	logLevel      = flag.String("log.level", "info", "Logging level")
 )
 
 func main() {
@@ -26,6 +27,9 @@ func main() {
 	default:
 		log.SetLevel(log.InfoLevel)
 	}
+
+	go CollectTimer(*queryInterval)
+
 	ceph := newCephCollector()
 	prometheus.MustRegister(ceph)
 
@@ -44,4 +48,5 @@ func main() {
 	})
 	log.Info("Listening on: ", *bindAddr)
 	log.Fatal(http.ListenAndServe(*bindAddr, nil))
+
 }

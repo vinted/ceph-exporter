@@ -2,18 +2,22 @@ package main
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 var schema = make(map[string]string)
+var cephMetrics = make(map[string]interface{})
+var cephDevice = make(map[string]interface{})
+var osdSchema = make(map[string]interface{})
 
 type cephCollector struct {
 }
@@ -71,25 +75,52 @@ func GetDeviceType(socketName string) map[string]string {
 	return device
 }
 
-func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
+func CollectTimer(queryInterval int) {
+	tickChan := time.NewTicker(time.Second * time.Duration(queryInterval))
+	quit := make(chan struct{})
+	for {
+		select {
+		case <-tickChan.C:
+			log.Debug("Collector timer triggered")
+			Collector()
+		case <-quit:
+			return
+		}
+	}
+}
 
-	scrapeTime := time.Now()
-	var cephMetrics map[string]interface{}
-	var cephDevice map[string]string
+func Collector() {
 
-	log.Debug("Processing request")
+	var cephDeviceTmp map[string]string
+	var mutex = &sync.Mutex{}
+
+	log.Debug("Collector started")
 	sockets := ListCephSockets()
 	for _, socket := range sockets {
-		cephDevice = GetDeviceType(socket)
-		if cephDevice["type"] == "" {
+		cephDeviceTmp = GetDeviceType(socket)
+		if cephDeviceTmp["type"] == "" {
 			log.Debug("Not a device. Skipping")
 			continue
 		}
-		cephMetrics = (LoadJson(GetMetrics(socket)))
-		osdSchema := (LoadJson(GetSchema(socket)))
-		for metricName, metricData := range cephMetrics {
+		mutex.Lock()
+		cephDevice[socket] = cephDeviceTmp
+		osdSchema[socket] = (LoadJson(GetSchema(socket)))
+		cephMetrics[socket] = (LoadJson(GetMetrics(socket)))
+		mutex.Unlock()
+	}
+	log.Debug("Collector stopped")
+}
+
+func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
+
+	scrapeTime := time.Now()
+
+	log.Debug("Processing HTTP request")
+
+	for socket, cephMetric := range cephMetrics {
+		for metricName, metricData := range cephMetric.(map[string]interface{}) {
 			for metricType, metricsValue := range metricData.(map[string]interface{}) {
-				metricSchema, ok := osdSchema[metricName]
+				metricSchema, ok := osdSchema[socket].(map[string]interface{})[metricName]
 				// There's a possibility, that no full schema is yet available when ceph daemon
 				// is starting. Thus we should check on that and destroy partial schema.
 				if !ok {
@@ -106,19 +137,19 @@ func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
 				// There are metrics with second level of data (SUMs and AVGs)
 				if reflect.TypeOf(metricsValue).Kind() == reflect.Map {
 					for metricType1, metricsValue1 := range metricsValue.(map[string]interface{}) {
-						description := CephPrometheusDesc(cephDevice["type"]+"_"+normalizedMetricName+"_"+metricType+"_"+metricType1, metricDescription)
-						ch <- prometheus.MustNewConstMetric(description, GetDatatype(dataType), metricsValue1.(float64), cephDevice["name"])
+						description := CephPrometheusDesc(cephDevice[socket].(map[string]string)["type"]+"_"+normalizedMetricName+"_"+metricType+"_"+metricType1, metricDescription)
+						ch <- prometheus.MustNewConstMetric(description, GetDatatype(dataType), metricsValue1.(float64), cephDevice[socket].(map[string]string)["name"])
 					}
 				} else {
-					description := CephPrometheusDesc(cephDevice["type"]+"_"+normalizedMetricName+"_"+metricType, metricDescription)
-					ch <- prometheus.MustNewConstMetric(description, GetDatatype(dataType), metricsValue.(float64), cephDevice["name"])
+					description := CephPrometheusDesc(cephDevice[socket].(map[string]string)["type"]+"_"+normalizedMetricName+"_"+metricType, metricDescription)
+					ch <- prometheus.MustNewConstMetric(description, GetDatatype(dataType), metricsValue.(float64), cephDevice[socket].(map[string]string)["name"])
 				}
 			}
 		}
 	}
 	description := prometheus.NewDesc("ceph_exporter_scrape_time", "Duration of a collector scrape", nil, nil)
 	ch <- prometheus.MustNewConstMetric(description, prometheus.GaugeValue, time.Since(scrapeTime).Seconds())
-	log.Debug("Finished")
+	log.Debug("HTTP request finished")
 }
 
 // Remove resctricted characters from metric name
