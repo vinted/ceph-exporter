@@ -101,7 +101,13 @@
 			"path": "golang.org/x/sys/windows",
 			"revision": "ac6580df4449443a05718fd7858c1f91ad5f8d20",
 			"revisionTime": "2019-12-09T02:16:22Z"
-		}
+		},
+    {
+      "checksumSHA1": "CwSOpXDuHSb1yI8qYtspmFQAb1M=",
+      "path": "github.com/ceph/go-ceph",
+      "revision": "f1f46a95bffeda825138622bc5d73117d6dd91c2",
+      "revisionTime": "2020-01-29T16:38:48Z"
+    },
 	],
 	"rootPath": "ceph-exporter"
 }

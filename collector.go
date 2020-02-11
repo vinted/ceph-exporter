@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+  "github.com/ceph/go-ceph/rados"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -19,6 +20,7 @@ var cephMetrics = make(map[string]interface{})
 var cephDevice = make(map[string]interface{})
 var osdSchema = make(map[string]interface{})
 var mutex = sync.RWMutex{}
+//var cephHealth = make(map[string]interface{})
 
 type cephCollector struct {
 }
@@ -107,6 +109,12 @@ func Collector() {
 		mutex.Unlock()
 	}
 	log.Debug("Collector stopped")
+}
+
+func CephHealthCollector(){
+  conn, _ := rados.NewConn()
+  conn.ReadDefaultConfigFile()
+  conn.Connect()
 }
 
 func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
