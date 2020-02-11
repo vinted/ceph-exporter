@@ -18,6 +18,7 @@ var schema = make(map[string]string)
 var cephMetrics = make(map[string]interface{})
 var cephDevice = make(map[string]interface{})
 var osdSchema = make(map[string]interface{})
+var mutex = sync.RWMutex{}
 
 type cephCollector struct {
 }
@@ -90,10 +91,7 @@ func CollectTimer(queryInterval int) {
 }
 
 func Collector() {
-
 	var cephDeviceTmp map[string]string
-	var mutex = &sync.Mutex{}
-
 	log.Debug("Collector started")
 	sockets := ListCephSockets()
 	for _, socket := range sockets {
@@ -112,11 +110,9 @@ func Collector() {
 }
 
 func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
-
 	scrapeTime := time.Now()
-
 	log.Debug("Processing HTTP request")
-
+	mutex.RLock()
 	for socket, cephMetric := range cephMetrics {
 		for metricName, metricData := range cephMetric.(map[string]interface{}) {
 			for metricType, metricsValue := range metricData.(map[string]interface{}) {
@@ -147,6 +143,7 @@ func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+	mutex.RUnlock()
 	description := prometheus.NewDesc("ceph_exporter_scrape_time", "Duration of a collector scrape", nil, nil)
 	ch <- prometheus.MustNewConstMetric(description, prometheus.GaugeValue, time.Since(scrapeTime).Seconds())
 	log.Debug("HTTP request finished")
