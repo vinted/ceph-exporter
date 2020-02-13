@@ -40,4 +40,7 @@ func TestCephHealthCollector(t *testing.T) {
 	if reflect.TypeOf(health["ceph_cluster_objects_misplaced"]).String() != "main.cephHealthData" {
 		t.Errorf("health[ceph_cluster_objects_misplaced] has wrong data")
 	}
+	if reflect.TypeOf(health["ceph_cluster_noout_flag"]).String() != "main.cephHealthData" {
+		t.Errorf("health[ceph_cluster_noout_flag] has wrong data")
+	}
 }

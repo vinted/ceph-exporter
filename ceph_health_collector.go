@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 type cephHealthStats struct {
@@ -53,6 +54,7 @@ func CephHealthCollector() map[string]cephHealthData {
 	var healthString string
 	var cephHealthStatus float64
 	var cephHealthStatusString string
+	var nooutFlag float64
 
 	if stats.Health.Status != "" {
 		cephHealthStatusString = stats.Health.Status
@@ -72,6 +74,7 @@ func CephHealthCollector() map[string]cephHealthData {
 	}
 
 	healthData["ceph_cluster_health_status"] = cephHealthData{value: cephHealthStatus, metricType: GaugeValue, help: "Ceph cluster health status (ok:0, warning:1, error:2)"}
+	healthData["ceph_cluster_noout_flag"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Status of noout flag (0:unset, 1:set)"}
 
 	healthData["ceph_cluster_pgs_degraded"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of degraded PGs"}
 	healthData["ceph_cluster_pgs_undersized"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of undersized PGs"}
@@ -83,7 +86,7 @@ func CephHealthCollector() map[string]cephHealthData {
 	healthData["ceph_cluster_pgs_recovery_wait"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of PGs waiting for recovery"}
 	healthData["ceph_cluster_pgs_peering"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of peering PGs"}
 	healthData["ceph_cluster_objects_degraded"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of degraded objects in a cluster"}
-	healthData["ceph_cluster_objects_misplaced"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of mislpaced objects in a cluster"}
+	healthData["ceph_cluster_objects_misplaced"] = cephHealthData{value: 0, metricType: GaugeValue, help: "Number of misplaced objects in a cluster"}
 
 	// Check if using new Nautilus status data structure.
 	if stats.Health.Checks != nil {
@@ -95,6 +98,15 @@ func CephHealthCollector() map[string]cephHealthData {
 		// Convert whole Health.Checks interface to string.
 		healthString = fmt.Sprintf("%v", stats.Health.Summary)
 	}
+
+	if strings.Contains(healthString, "noout flag(s) set") {
+		nooutFlag = 1
+	} else {
+		nooutFlag = 0
+	}
+	var tmp = healthData["ceph_cluster_noout_flag"]
+	tmp.value = float64(nooutFlag)
+	healthData["ceph_cluster_noout_flag"] = tmp
 
 	// Do regex match against status string and build metrics
 	re := regexp.MustCompile(`([\d]+) pgs degraded`)
