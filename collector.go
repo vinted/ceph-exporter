@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-  "github.com/ceph/go-ceph/rados"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -19,8 +18,13 @@ var schema = make(map[string]string)
 var cephMetrics = make(map[string]interface{})
 var cephDevice = make(map[string]interface{})
 var osdSchema = make(map[string]interface{})
+var clusterHealth = make(map[string]cephHealthData)
 var mutex = sync.RWMutex{}
-//var cephHealth = make(map[string]interface{})
+
+const (
+	GaugeValue   = 2
+	CounterValue = 10
+)
 
 type cephCollector struct {
 }
@@ -106,15 +110,12 @@ func Collector() {
 		cephDevice[socket] = cephDeviceTmp
 		osdSchema[socket] = (LoadJson(GetSchema(socket)))
 		cephMetrics[socket] = (LoadJson(GetMetrics(socket)))
+		if *healthCollector {
+			clusterHealth = CephHealthCollector()
+		}
 		mutex.Unlock()
 	}
 	log.Debug("Collector stopped")
-}
-
-func CephHealthCollector(){
-  conn, _ := rados.NewConn()
-  conn.ReadDefaultConfigFile()
-  conn.Connect()
 }
 
 func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
@@ -150,6 +151,10 @@ func (collector *cephCollector) Collect(ch chan<- prometheus.Metric) {
 				}
 			}
 		}
+	}
+	for clusterHealthMetric, clusterHealthData := range clusterHealth {
+		description := CephPrometheusDesc(clusterHealthMetric, clusterHealthData.help)
+		ch <- prometheus.MustNewConstMetric(description, GetDatatype(clusterHealthData.metricType), clusterHealthData.value, "mon")
 	}
 	mutex.RUnlock()
 	description := prometheus.NewDesc("ceph_exporter_scrape_time", "Duration of a collector scrape", nil, nil)
