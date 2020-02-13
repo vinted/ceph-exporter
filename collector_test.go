@@ -45,6 +45,10 @@ func TestGetDeviceType(t *testing.T) {
 	if value["type"] != "ceph_radosgw" || value["name"] != "radosgw" {
 		t.Errorf("GetDeviceType failed. Got: type: %s, name: %s", value["type"], value["name"])
 	}
+	value = GetDeviceType("/var/run/ceph/ceph-cluster-client.radosgw.test-ceph-mgr.asok")
+	if value["type"] != "ceph_mgr" || value["name"] != "mgr" {
+		t.Errorf("GetDeviceType failed. Got: type: %s, name: %s", value["type"], value["name"])
+	}
 }
 
 func TestLoadJson(t *testing.T) {
