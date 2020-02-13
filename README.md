@@ -39,3 +39,10 @@ Following config parameters are available:
     	host:port for ceph exporter (default ":9353")
   -query.interval int
       How often should daemon read asok metrics (default 15)
+  -health.collector bool
+      Collect health status from ceph monitor (default false).
+      This collector should not run on every ceph cluster node. It is enough to
+      have single health.collector (or several for HA) enabled to collect cluster health.
+  -config.file string
+      Path to ceph config file (default /etc/ceph/ceph.conf).
+      Needed only when health.collector is enabled
